@@ -5,6 +5,9 @@
 
 #include <Servo.h>
 
+#define LASERPIN 12
+#define BUTTONPIN 2
+
 Servo servo_yaw;
 Servo servo_pitch;
 
@@ -28,7 +31,11 @@ Serial.println("Starting up");
 #ifdef DEBUG
 Serial.println("DEBUG ENABLED");
 #endif
-
+  
+  pinMode(LASERPIN, OUTPUT);
+  
+  pinMode(BUTTONPIN, INPUT_PULLUP);
+  
 servo_yaw.attach(9);
 servo_pitch.attach(6);
 servo_yaw.write(90);
@@ -38,6 +45,9 @@ delay(5000);
 
 void loop() {
   // put your main code here, to run repeatedly:
+
+if(!checkButton())
+{  
 US = getInchesFromString(usValues[index]);
 SLR = getInchesFromString(slrValues[index]);
 
@@ -52,8 +62,7 @@ Serial.println(SLR);
 Serial.println(slrValues[index]);
 #endif
 
-if(checkButton())
-{
+
  lase(US,SLR);
  index++;
  if(index > 6)
@@ -164,15 +173,15 @@ void takeSteps(int steps)
 
 boolean checkButton()
 {
-  return 1;
+  return digitalRead(BUTTONPIN);
 }
 
 void laserOFF()
 {
- //TODO
+ digitalWrite(LASERPIN, 0);
 }
 
 void laserON()
 {
-  //TODO
+  digitalWrite(LASERPIN, 1);
 }
