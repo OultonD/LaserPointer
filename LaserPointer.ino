@@ -4,6 +4,7 @@
 //Test with servos?
 
 #define DEBUG
+//#define USING_SD
 
 #include <Servo.h>
 #include <ShiftedLCD.h>
@@ -16,8 +17,8 @@
 #define PIN_SPI_MOSI 11
 #define PIN_SPI_MISO 12
 
-#define LASERPIN 12
-#define BUTTONPIN 2
+#define LASERPIN A5
+#define BUTTONPIN A4
 
 //Create Servos or Steppers
 Servo servo_yaw;
@@ -76,7 +77,7 @@ digitalWrite(LCD_SELECT, HIGH);
 lcd.begin(16,2);
 lcd.clear();
 lcd.print("Starting up");
-
+#ifdef USING_SD
 if(!sd.begin())// Initialize SD card
   {
     Serial.println("Error opening SD Card");
@@ -109,6 +110,7 @@ else
 }   
 
 csv.gotoBeginOfFile();
+#endif
 
 #ifdef DEBUG
 Serial.println("DEBUG ENABLED");
@@ -119,16 +121,31 @@ Serial.println("DEBUG ENABLED");
 pinMode(LASERPIN, OUTPUT);
 pinMode(BUTTONPIN, INPUT_PULLUP);
 
-stepper_yaw.setRpm(12);
-stepper_pitch.setRpm(12);
+stepper_yaw.setRpm(14);
+stepper_pitch.setRpm(14);
 stepper_yaw.set4076StepMode();
 stepper_pitch.set4076StepMode();
-  
+
+#ifdef DEBUG
+Serial.println("Moving test");
+#endif
+
+
+point(90.0,0.0);
+//delay(1500);
+point(-90.0,0.0);
+//delay(1500);
+point(0.0,0.0);
+//delay(1500);
+point(0.0,-80.0);
+//delay(1500);
+point(0.0,0.0);
+
 //servo_yaw.attach(9);
 //servo_pitch.attach(6);
 //servo_yaw.write(90);
 //servo_pitch.write(90);
-
+updateLCD();
 delay(1000);
 }
 
@@ -138,40 +155,35 @@ delay(1000);
 
 void loop() {
   // put your main code here, to run repeatedly:
-updateLCD();
+//updateLCD();
 
 buttonStatus = !checkButton(); //invert for pullup
 
 if(buttonStatus == true && buttonStatus != lastButtonStatus)
-{  
+{ 
+  #ifdef USING_SD 
   getNextValuesFromCard();
+  #else
+  usValue = usValues[index];
+  slrValue = slrValues[index];
+  index++;
+  if(index > 6)
+  {
+    index = 0;
+  }
+  #endif
+
   lcdLine1 = usValue + "," + slrValue;
   
-  US = getInchesFromString(usValues[index]);
-  SLR = getInchesFromString(slrValues[index]);
-              //
-              //    #ifdef DEBUG
-              //    Serial.println("Index: ");
-              //    Serial.println(index);
-              //    Serial.println("US: ");
-              //    Serial.println(US);
-              //    Serial.println(usValues[index]);
-              //    Serial.println("SLR: ");
-              //    Serial.println(SLR);
-              //    Serial.println(slrValues[index]);
-              //    #endif
-
+  US = getInchesFromString(usValue);
+  SLR = getInchesFromString(slrValue);
 
     lase(US,SLR);
      
-    index++;
-     if(index > 6)
-      {
-        index = 0;
-       }
     #ifdef DEBUG
     Serial.println("---Loop End---");
     #endif
+    updateLCD();
     delay(2000);
    }
 
@@ -203,11 +215,19 @@ void lase(double US, double SLR)
 void point(double t1, double t2)
 {
   lcdLine2 = "Moving";
+
   double deltaYaw = t1 - lastT1; //how many degrees to move
   double deltaPitch = t2 - lastT2;
+
+  #ifdef DEBUG
+  Serial.print("Moving to: " + String(t1));
+  Serial.println(" and " + String(t2));
+  Serial.print("Delta of: " + String(deltaYaw));
+  Serial.println(" and " + String(deltaPitch));  
+  #endif
   
-  int yawSteps = deltaYaw/stepsPerDegree;
-  int pitchSteps = deltaPitch/stepsPerDegree;
+  int yawSteps = deltaYaw*stepsPerDegree;
+  int pitchSteps = deltaPitch*stepsPerDegree;
 //  
 //  //for(int i=0;i<(t1+90);i++)
 //  //{
@@ -268,17 +288,39 @@ double getInchesFromString(String s)
 
 void takeSteps(int yS, int pS)
 {
- bool yawDir = (yS >= 0);
- stepper_yaw.newMove(yawDir, yS);
- bool pitchDir = (pS >= 0);
- stepper_pitch.newMove(pitchDir, pS);
- while(stepper_yaw.getStepsLeft() > 0 && stepper_pitch.getStepsLeft() > 0)
+
+  #ifdef DEBUG
+  Serial.println();
+  Serial.println("Yaw steps: " + String(yS));
+  Serial.println("Pitch steps: " + String(pS)); 
+  #endif
+
+ 
+ if(yS >= 0)
+ {
+ stepper_yaw.newMove(true, abs(yS));
+ }
+ else
+ {
+ stepper_yaw.newMove(false, abs(yS));
+ }
+ if(pS >= 0)
+ {
+ stepper_pitch.newMove(true, abs(pS));
+ }
+ else
+ {
+ stepper_pitch.newMove(false, abs(pS));
+ }
+
+ while(stepper_yaw.getStepsLeft() != 0 || stepper_pitch.getStepsLeft() != 0)
  {
  stepper_yaw.run();
  stepper_pitch.run();
  }
 }
 
+#ifdef USING_SD
 bool getNextValuesFromCard()
 {
   char buffer[CSV_BUFFER_SIZE+1];
@@ -313,9 +355,15 @@ else
 lcdLine1 = "Read Successful";
 return true;
 }
+#endif
 
 void updateLCD()
 {
+#ifdef DEBUG
+Serial.println(lcdLine1);
+Serial.println(lcdLine2);
+Serial.println();
+#endif
 lcd.clear();
 lcd.print(lcdLine1);
 lcd.setCursor(0, 1);
