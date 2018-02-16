@@ -32,7 +32,7 @@ int index = 0;
 //Math globals
 double US = 0.0;
 double SLR = 0.0;
-double HEIGHT = 48.0; //Laser height, in INCHES
+double HEIGHT = 36.0; //Laser height, in INCHES
 double lastT1 = 0.0;
 double lastT2 = 0.0;
 
@@ -55,7 +55,7 @@ const byte CSV_BUFFER_SIZE = 10;
 //LCD info
 #define LCD_SELECT A0
 LiquidCrystal lcd(LCD_SELECT);
-String lcdLine1 = "Setup Complete";
+String lcdLine1 = "Self Test";
 String lcdLine2 = "Waiting";
 
 
@@ -137,7 +137,7 @@ point(-90.0,0.0);
 //delay(1500);
 point(0.0,0.0);
 //delay(1500);
-point(0.0,-80.0);
+point(0.0,90.0);
 //delay(1500);
 point(0.0,0.0);
 
@@ -184,7 +184,7 @@ if(buttonStatus == true && buttonStatus != lastButtonStatus)
     Serial.println("---Loop End---");
     #endif
     updateLCD();
-    delay(2000);
+    //delay(2000);
    }
 
 }
@@ -194,9 +194,9 @@ void lase(double US, double SLR)
 {
   laserOFF();
   //Calculate the angles
-  double floorHyp = sqrt(square(US) + square(SLR)); //floor hypotenuse
-  double theta1 = (atan2(SLR,US)*4068)/71; //yaw
-  double theta2 = (atan2(floorHyp, HEIGHT)*4068)/71; //pitch
+  double floorHyp = sqrt((US*US) + (SLR*SLR)); //floor hypotenuse
+  double theta1 = (atan2(SLR,US)*4068/71); //yaw
+  double theta2 = (atan2(floorHyp, HEIGHT)*4068/71); //pitch
   
   #ifdef DEBUG
   Serial.println("theta1: ");
@@ -317,6 +317,10 @@ void takeSteps(int yS, int pS)
  {
  stepper_yaw.run();
  stepper_pitch.run();
+ }
+ for(int i = 0; i<=9; i++)
+ {
+  digitalWrite(i, LOW);
  }
 }
 
