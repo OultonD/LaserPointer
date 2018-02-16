@@ -1,17 +1,26 @@
-
-
 //TODO: stepper code, laser code, button code
 //Test with servos?
 
 #define DEBUG
 //#define USING_SD
 
-#include <Servo.h>
+#include <IRL_Decode.h>
+#include <IRL_Hash.h>
+#include <IRL_Keycodes.h>
+#include <IRL_Nec.h>
+#include <IRL_NecAPI.h>
+#include <IRL_Panasonic.h>
+#include <IRL_Protocol.h>
+#include <IRL_Receive.h>
+#include <IRL_Time.h>
+#include <IRLremote.h>
+
 #include <ShiftedLCD.h>
 #include <SPI.h>
 #include <SdFat.h>
 #include <CSVFile.h>
 #include <CheapStepper.h>
+
 
 #define PIN_SPI_CLK 13
 #define PIN_SPI_MOSI 11
@@ -20,14 +29,16 @@
 #define LASERPIN A5
 #define BUTTONPIN A4
 
-//Create Servos or Steppers
-Servo servo_yaw;
-Servo servo_pitch;
-double stepsPerDegree = 11.3;
-CheapStepper stepper_yaw(2,3,4,5);
-CheapStepper stepper_pitch(6,7,8,9);
-
 int index = 0;
+
+//Create Steppers
+double stepsPerDegree = 11.3;
+CheapStepper stepper_yaw(3,4,5,6);
+CheapStepper stepper_pitch(7,8,9,10);
+
+//IR Sensor
+#define IRPIN 2
+CNec Remote;
 
 //Math globals
 double US = 0.0;
@@ -49,7 +60,7 @@ String slrValue = "";
 //SD Card
 SdFat sd;
 CSVFile csv;
-#define SD_SELECT 10
+#define SD_SELECT A1
 const byte CSV_BUFFER_SIZE = 10;
 
 //LCD info
@@ -77,6 +88,9 @@ digitalWrite(LCD_SELECT, HIGH);
 lcd.begin(16,2);
 lcd.clear();
 lcd.print("Starting up");
+
+Remote.begin(IRPIN);
+
 #ifdef USING_SD
 if(!sd.begin())// Initialize SD card
   {
@@ -141,12 +155,8 @@ point(0.0,90.0);
 //delay(1500);
 point(0.0,0.0);
 
-//servo_yaw.attach(9);
-//servo_pitch.attach(6);
-//servo_yaw.write(90);
-//servo_pitch.write(90);
 updateLCD();
-delay(1000);
+
 }
 
 ////////////////////////////////////
@@ -155,9 +165,22 @@ delay(1000);
 
 void loop() {
   // put your main code here, to run repeatedly:
-//updateLCD();
+
 
 buttonStatus = !checkButton(); //invert for pullup
+
+if (Remote.available())
+{
+    // Get the new data from the remote
+    auto data = Remote.read();
+
+    // Print the protocol data
+    Serial.print(F("Address: 0x"));
+    Serial.println(data.address, HEX);
+    Serial.print(F("Command: 0x"));
+    Serial.println(data.command, HEX);
+    Serial.println();
+}
 
 if(buttonStatus == true && buttonStatus != lastButtonStatus)
 { 
@@ -228,17 +251,7 @@ void point(double t1, double t2)
   
   int yawSteps = deltaYaw*stepsPerDegree;
   int pitchSteps = deltaPitch*stepsPerDegree;
-//  
-//  //for(int i=0;i<(t1+90);i++)
-//  //{
-//  servo_yaw.write(t1+90);
-//  delay(150);
-//  //}
-//  //for(int i=0;i<(t2+90);i++)
-//  //{
-//  servo_pitch.write(t2);
-//  delay(150);
-//  //}
+
   updateLCD();
   takeSteps(yawSteps, pitchSteps);
   lcdLine2 = "Done";
@@ -315,10 +328,14 @@ void takeSteps(int yS, int pS)
 
  while(stepper_yaw.getStepsLeft() != 0 || stepper_pitch.getStepsLeft() != 0)
  {
- stepper_yaw.run();
+ if(!Remote.receiving()){
+   stepper_yaw.run();
  stepper_pitch.run();
  }
- for(int i = 0; i<=9; i++)
+ }
+ delay(250);
+ //hacky af to prevent overheating
+ for(int i = 3; i<=10; i++)
  {
   digitalWrite(i, LOW);
  }
