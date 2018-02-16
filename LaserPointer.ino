@@ -2,7 +2,7 @@
 //Test with servos?
 
 #define DEBUG
-//#define USING_SD
+#define USING_SD
 
 #include <IRL_Decode.h>
 #include <IRL_Hash.h>
@@ -38,7 +38,7 @@ CheapStepper stepper_pitch(7,8,9,10);
 
 //IR Sensor
 #define IRPIN 2
-CNec Remote;
+CHashIR Remote;
 
 //Math globals
 double US = 0.0;
@@ -92,7 +92,7 @@ lcd.print("Starting up");
 Remote.begin(IRPIN);
 
 #ifdef USING_SD
-if(!sd.begin())// Initialize SD card
+if(!sd.begin(SD_SELECT))// Initialize SD card
   {
     Serial.println("Error opening SD Card");
     lcd.clear();
@@ -109,12 +109,12 @@ else
     // You should use flag O_RDWR even if you use CSV File
     // only for writting.
  
-if(!csv.open("file.csv", O_RDWR | O_CREAT))// Initialize SD card
+if(!csv.open("coords.csv", O_RDWR | O_CREAT))// Initialize SD card
   {
     Serial.println("Error opening File");
     lcd.clear();
     lcd.print("Error opening File");
-    return;
+//    return;
   }
 else
 {
@@ -144,7 +144,7 @@ stepper_pitch.set4076StepMode();
 Serial.println("Moving test");
 #endif
 
-
+#ifndef DEBUG
 point(90.0,0.0);
 //delay(1500);
 point(-90.0,0.0);
@@ -154,7 +154,7 @@ point(0.0,0.0);
 point(0.0,90.0);
 //delay(1500);
 point(0.0,0.0);
-
+#endif
 updateLCD();
 
 }
@@ -169,23 +169,50 @@ void loop() {
 
 buttonStatus = !checkButton(); //invert for pullup
 
-if (Remote.available())
-{
-    // Get the new data from the remote
-    auto data = Remote.read();
+//if (Remote.available())
+//{
+//    // Get the new data from the remote
+//    auto data = Remote.read();
+//
+//    // Print the protocol data
+//    Serial.print(F("Address: 0x"));
+//    Serial.println(data.address, HEX);
+//    Serial.print(F("Command: 0x"));
+//    Serial.println(data.command, HEX);
+//    Serial.println();
+//    Serial.println("=====================");
+//}
 
-    // Print the protocol data
-    Serial.print(F("Address: 0x"));
-    Serial.println(data.address, HEX);
-    Serial.print(F("Command: 0x"));
-    Serial.println(data.command, HEX);
-    Serial.println();
-}
-
-if(buttonStatus == true && buttonStatus != lastButtonStatus)
+if((buttonStatus == true && buttonStatus != lastButtonStatus) || Remote.available())
 { 
-  #ifdef USING_SD 
-  getNextValuesFromCard();
+  auto data = Remote.read();
+  #ifdef USING_SD
+  switch(data.command){
+  
+  case 0xF5603691: //NEXT - Apple Remote
+  if(getNextValuesFromCard())
+  {
+  lcdLine1 = usValue + "," + slrValue;
+  
+  US = getInchesFromString(usValue);
+  SLR = getInchesFromString(slrValue);
+
+    lase(US,SLR);
+  }
+  break;
+  
+  case 0x41F5B3D1: //PREV - Apple Remote
+    if(getPrevValuesFromCard())
+  {
+  lcdLine1 = usValue + "," + slrValue;
+  
+  US = getInchesFromString(usValue);
+  SLR = getInchesFromString(slrValue);
+
+    lase(US,SLR);
+  }
+  break;
+  }
   #else
   usValue = usValues[index];
   slrValue = slrValues[index];
@@ -194,18 +221,14 @@ if(buttonStatus == true && buttonStatus != lastButtonStatus)
   {
     index = 0;
   }
-  #endif
-
-  lcdLine1 = usValue + "," + slrValue;
+    lcdLine1 = usValue + "," + slrValue;
   
   US = getInchesFromString(usValue);
   SLR = getInchesFromString(slrValue);
 
     lase(US,SLR);
-     
-    #ifdef DEBUG
-    Serial.println("---Loop End---");
-    #endif
+  #endif
+
     updateLCD();
     //delay(2000);
    }
@@ -371,6 +394,46 @@ if(csv.nextLine())
 else
 {
   lcdLine1 = "End of File";
+  return false;
+}
+lcdLine1 = "Read Successful";
+return true;
+}
+#endif
+#ifdef USING_SD
+bool getPrevValuesFromCard()
+{
+  char buffer[CSV_BUFFER_SIZE+1];
+  buffer[CSV_BUFFER_SIZE] = '\0';
+  int prevLine = csv.getNumberOfLine()-1;
+if(prevLine > 0)
+{  
+  if(csv.gotoLine(prevLine))
+  {
+    if(csv.readField(buffer, CSV_BUFFER_SIZE))
+    {
+      usValue = String(buffer);
+    }
+    else
+    {
+      lcdLine1 = "US Read Fail";
+      return false;
+    }
+    csv.nextField();
+    if(csv.readField(buffer, CSV_BUFFER_SIZE))
+    {
+      slrValue = String(buffer);
+    }
+    else
+    {
+      lcdLine1 = "SL/R Read Fail";
+      return false;
+    }
+  }
+}
+else
+{
+  lcdLine1 = "Beginning of File";
   return false;
 }
 lcdLine1 = "Read Successful";
