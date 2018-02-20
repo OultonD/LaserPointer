@@ -26,6 +26,9 @@
 #define PIN_SPI_MOSI 11
 #define PIN_SPI_MISO 12
 
+#define SD_SELECT A1
+#define LCD_SELECT A0
+
 #define LASERPIN A5
 #define BUTTONPIN A4
 
@@ -51,20 +54,19 @@ double lastT2 = 0.0;
 bool buttonStatus = false;
 bool lastButtonStatus = false;
 
+#ifndef USING_SD
 String usValues[] = {"4'2", "6'9", "1'0","15'10.25", "30'11.75", "25'0", "3'0"};
 String slrValues[] = {"8'11.5", "-6'0","22'3","0'5","-22'0", "-10'5", "-25'2"};
-
+#endif
 String usValue = "";
 String slrValue = "";
 
 //SD Card
 SdFat sd;
 CSVFile csv;
-#define SD_SELECT A1
 const byte CSV_BUFFER_SIZE = 10;
 
 //LCD info
-#define LCD_SELECT A0
 LiquidCrystal lcd(LCD_SELECT);
 String lcdLine1 = "Self Test";
 String lcdLine2 = "Waiting";
@@ -169,23 +171,20 @@ void loop() {
 
 buttonStatus = !checkButton(); //invert for pullup
 
-//if (Remote.available())
-//{
-//    // Get the new data from the remote
-//    auto data = Remote.read();
-//
-//    // Print the protocol data
-//    Serial.print(F("Address: 0x"));
-//    Serial.println(data.address, HEX);
-//    Serial.print(F("Command: 0x"));
-//    Serial.println(data.command, HEX);
-//    Serial.println();
-//    Serial.println("=====================");
-//}
 
 if((buttonStatus == true && buttonStatus != lastButtonStatus) || Remote.available())
 { 
   auto data = Remote.read();
+  #ifdef DEBUG
+    // Print the protocol data
+    Serial.print(F("Address: 0x"));
+    Serial.println(data.address, HEX);
+    Serial.print(F("Command: 0x"));
+    Serial.println(data.command, HEX);
+    Serial.println();
+    Serial.println("=====================");
+  #endif
+  
   #ifdef USING_SD
   switch(data.command){
   
